@@ -134,6 +134,11 @@ out
 backend/dist/*
 !backend/dist/.gitkeep
 backend/sub-store.min.js
+frontend/dist/
+frontend/node_modules/
+release-out/
+*.tar.zst
+*.tar.gz
 
 CHANGELOG.md
 

@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   http-proxy@1.18.1:
-    hash: 8071c23044f455271f4d4074ae4c7b81beec17a03aefd158d5f4edd4ef751c11
+    hash: qqiqxx62zlcu62nljjmhlvexni
     path: patches/http-proxy@1.18.1.patch
 
 importers:
@@ -4161,14 +4161,14 @@ snapshots:
     dependencies:
       '@types/http-proxy': 1.17.15
       debug: 4.4.0(supports-color@8.1.1)
-      http-proxy: 1.18.1(patch_hash=8071c23044f455271f4d4074ae4c7b81beec17a03aefd158d5f4edd4ef751c11)(debug@4.4.0)
+      http-proxy: 1.18.1(patch_hash=qqiqxx62zlcu62nljjmhlvexni)(debug@4.4.0)
       is-glob: 4.0.3
       is-plain-object: 5.0.0
       micromatch: 4.0.8
     transitivePeerDependencies:
       - supports-color
 
-  http-proxy@1.18.1(patch_hash=8071c23044f455271f4d4074ae4c7b81beec17a03aefd158d5f4edd4ef751c11)(debug@4.4.0):
+  http-proxy@1.18.1(patch_hash=qqiqxx62zlcu62nljjmhlvexni)(debug@4.4.0):
     dependencies:
       eventemitter3: 4.0.7
       follow-redirects: 1.15.9(debug@4.4.0)

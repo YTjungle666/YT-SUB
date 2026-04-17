@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker-and-template:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build runtime image
+        run: docker build --target runtime -t yt-sub-ci:runtime .
+
+      - name: Build CT image
+        run: docker build --target ct-template -t yt-sub-ci:ct-template .
+
+      - name: Smoke test HTTP entry
+        run: |
+          cid=$(docker run -d -p 18080:80 yt-sub-ci:runtime)
+          trap 'docker logs "$cid" || true; docker rm -f "$cid" || true' EXIT
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/ping >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/ping
+          curl -fsS http://127.0.0.1:18080/api/utils/env | tee /tmp/env.json
+          grep -q '"status":"success"' /tmp/env.json
+          curl -fsS http://127.0.0.1:18080/ | grep -qi '<html'
+
+      - name: Install zstd
+        run: sudo apt-get update && sudo apt-get install -y zstd
+
+      - name: Export PVE CT template
+        run: ./scripts/export-pve-template.sh yt-sub-ci:ct-template release-out/yt-sub-alpine-ct-template.tar.zst
+
+      - name: Prepare release files
+        run: |
+          cid=$(docker create yt-sub-ci:runtime)
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          rm -rf /tmp/yt-sub-release
+          mkdir -p /tmp/yt-sub-release/backend /tmp/yt-sub-release/frontend
+          docker cp "$cid":/app/backend/sub-store.bundle.js /tmp/yt-sub-release/backend/sub-store.bundle.js
+          docker cp "$cid":/app/frontend/. /tmp/yt-sub-release/frontend/
+          ./scripts/prepare-release-files.sh release-out /tmp/yt-sub-release/backend/sub-store.bundle.js /tmp/yt-sub-release/frontend release-out/yt-sub-alpine-ct-template.tar.zst
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: yt-sub-release
+          path: release-out/

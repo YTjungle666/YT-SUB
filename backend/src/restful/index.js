@@ -27,6 +27,7 @@ import registerParserRoutes from './parser';
 export default function serve() {
     let port;
     let host;
+    const servers = [];
     if ($.env.isNode) {
         port = eval('process.env.SUB_STORE_BACKEND_API_PORT') || 3000;
         host = eval('process.env.SUB_STORE_BACKEND_API_HOST') || '::';
@@ -43,13 +44,63 @@ export default function serve() {
                     'SUB_STORE_FRONTEND_BACKEND_PATH should start with /',
                 );
             }
+            const mergeAtRoot = be_merge && fe_be_path === '/';
             if (be_merge) {
                 $.info(`[BACKEND] MERGE mode is [ON].`);
                 $.info(`[BACKEND && FRONTEND] ${host}:${port}`);
             }
             $.info(`[BACKEND PREFIX] ${host}:${port}${fe_be_path}`);
             $app.use((req, res, next) => {
-                if (req.path.startsWith(fe_be_path)) {
+                if (mergeAtRoot) {
+                    const pathname =
+                        decodeURIComponent(req._parsedUrl.pathname) || '/';
+                    if (req.path.startsWith('/share/')) {
+                        if (req.method.toLowerCase() !== 'get') {
+                            res.status(405).send('Method not allowed');
+                            return;
+                        }
+                        if (!req.query.token) {
+                            res.status(404).end();
+                            return;
+                        }
+                        const tokens = $.read(TOKENS_KEY) || [];
+                        const token = tokens.find(
+                            (t) =>
+                                t.token === req.query.token &&
+                                (`/share/${t.type}/${t.name}` === pathname ||
+                                    pathname.startsWith(
+                                        `/share/${t.type}/${t.name}/`,
+                                    )) &&
+                                (t.exp == null || t.exp > Date.now()),
+                        );
+                        if (token) {
+                            next();
+                            return;
+                        }
+                        const settings = $.read(SETTINGS_KEY);
+                        if (settings?.appearanceSetting?.invalidShareFakeNode) {
+                            req.query._fakeNode = true;
+                            req.url = req.url.replace(
+                                /\/share\/.*?\//,
+                                '/share/sub/',
+                            );
+                            next();
+                            return;
+                        }
+                        res.status(404).end();
+                        return;
+                    }
+                    const isBackendRoute =
+                        /^\/(api|download|share)(\/|$)/.test(req.path) ||
+                        req.path === '/ping';
+                    if (isBackendRoute) {
+                        if (req.path.startsWith('/api/')) {
+                            req.query['share'] = 'true';
+                        }
+                        next();
+                        return;
+                    }
+                } else if (req.path.startsWith(fe_be_path)) {
                     req.url = req.url.replace(fe_be_path, '') || '/';
                     if (be_merge && req.url.startsWith('/api/')) {
                         req.query['share'] = 'true';
@@ -60,6 +111,7 @@ export default function serve() {
                 const pathname =
                     decodeURIComponent(req._parsedUrl.pathname) || '/';
                 if (
+                    !mergeAtRoot &&
                     be_merge &&
                     req.path.startsWith('/share/') &&
                     req.query.token
@@ -94,9 +146,9 @@ export default function serve() {
                         }
                     }
                 }
-                const isBackendRoute = /^\/(api|download|share)(\/|$)/.test(
-                    req.path,
-                );
+                const isBackendRoute =
+                    /^\/(api|download|share)(\/|$)/.test(req.path) ||
+                    req.path === '/ping';
                 if (be_merge && fe_path && !isBackendRoute) {
                     const express_ = eval(`require("express")`);
                     const mime_ = eval(`require("mime-types")`);
@@ -139,8 +191,12 @@ export default function serve() {
     registerNodeInfoRoutes($app);
     registerMiscRoutes($app);
     registerParserRoutes($app);
+    $app.get('/ping', (_, res) => res.status(200).send('pong'));
 
-    $app.start();
+    const backendServer = $app.start();
+    if (backendServer) {
+        servers.push({ name: 'backend', server: backendServer });
+    }
 
     if ($.env.isNode) {
         // Deprecated: SUB_STORE_BACKEND_CRON, SUB_STORE_CRON
@@ -449,9 +505,9 @@ export default function serve() {
             );
             app.use(staticFileMiddleware);
 
-            const listener = app.listen(fe_port, fe_host, () => {
+            const frontendServer = app.listen(fe_port, fe_host, () => {
                 const { address: fe_address, port: fe_port } =
-                    listener.address();
+                    frontendServer.address();
                 $.info(`[FRONTEND] ${fe_address}:${fe_port}`);
                 if (fe_be_path) {
                     $.info(
@@ -465,6 +521,7 @@ export default function serve() {
                     );
                 }
             });
+            servers.push({ name: 'frontend', server: frontendServer });
         }
         if (data_url) {
             $.info(`[BACKEND] downloading data from ${data_url}`);
@@ -513,5 +570,55 @@ export default function serve() {
                     throw e;
                 });
         }
+        let shuttingDown = false;
+        const shutdown = (signal) => {
+            if (shuttingDown) return;
+            shuttingDown = true;
+            $.info(`[SHUTDOWN] received ${signal}, closing services`);
+
+            if (!servers.length) {
+                process.exit(0);
+                return;
+            }
+
+            let pending = servers.length;
+            const forceExit = setTimeout(() => {
+                $.error('[SHUTDOWN] timeout reached, forcing exit');
+                process.exit(0);
+            }, 10_000);
+
+            servers.forEach(({ name, server }) => {
+                if (!server || typeof server.close !== 'function') {
+                    pending -= 1;
+                    if (pending === 0) {
+                        clearTimeout(forceExit);
+                        process.exit(0);
+                    }
+                    return;
+                }
+                server.close((error) => {
+                    if (error) {
+                        $.error(
+                            `[SHUTDOWN] failed to close ${name}: ${
+                                error.message ?? error
+                            }`,
+                        );
+                    } else {
+                        $.info(`[SHUTDOWN] ${name} closed`);
+                    }
+                    pending -= 1;
+                    if (pending === 0) {
+                        clearTimeout(forceExit);
+                        process.exit(0);
+                    }
+                });
+            });
+        };
+
+        ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT', 'SIGPWR'].forEach(
+            (signal) => {
+            process.once(signal, () => shutdown(signal));
+            },
+        );
     }
 }

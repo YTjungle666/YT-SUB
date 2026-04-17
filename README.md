@@ -23,6 +23,32 @@ Core functionalities:
 3. Collect multiple subscriptions in one URL.
 4. Host and modify subscriptions/files
 
+## Self-hosted fork
+
+This fork vendors the official `Sub-Store-Front-End` source into the repository and serves it directly from the backend in merge mode.
+
+- Frontend is available directly on `http://<ip>:80/`
+- API stays on the same origin under `/api`, `/download`, and `/share`
+- No separate HTTPS frontend, magic path, or extra reverse proxy is required for basic self-hosted usage
+
+### Docker
+
+```bash
+docker run -d \
+  --name yt-sub \
+  -p 80:80 \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/ytjungle666/yt-sub:latest
+```
+
+### PVE / CT template
+
+CI produces `yt-sub-alpine-ct-template.tar.zst`. You can also export a local image into a PVE-compatible CT template with:
+
+```bash
+./scripts/export-pve-template.sh ghcr.io/ytjungle666/yt-sub:latest release-out/yt-sub-alpine-ct-template.tar.zst
+```
+
 > The following descriptions of features may not be updated in real-time. Please refer to the actual available features for accurate information.
 
 ## 1. Subscription Conversion

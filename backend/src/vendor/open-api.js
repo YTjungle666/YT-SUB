@@ -347,10 +347,22 @@ export class OpenAPI {
     }
 
     info(msg) {
+        if (
+            isNode &&
+            eval('process.env.SUB_STORE_LOG_LEVEL') === 'silent'
+        ) {
+            return;
+        }
         console.log(`[${this.name}] INFO: ${msg}`);
     }
 
     error(msg) {
+        if (
+            isNode &&
+            eval('process.env.SUB_STORE_LOG_LEVEL') === 'silent'
+        ) {
+            return;
+        }
         console.log(`[${this.name}] ERROR: ${msg}`);
     }
 
