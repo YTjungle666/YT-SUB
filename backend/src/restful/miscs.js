@@ -117,12 +117,18 @@ function getEnv(req, res) {
     if (req.query.share) {
         env.feature.share = true;
     }
+    const mergedFrontendEnabled =
+        env.meta?.node?.env?.SUB_STORE_BACKEND_MERGE === 'true' &&
+        !!env.meta?.node?.env?.SUB_STORE_FRONTEND_PATH;
+    const guide = mergedFrontendEnabled
+        ? '当前实例已集成前端，直接访问当前服务根路径即可使用管理界面；API 仍然通过同源 /api、/download、/share 路径提供服务。'
+        : '⚠️⚠️⚠️ 您当前看到的是后端的响应. 若想配合前端使用, 可访问官方前端 https://sub-store.vercel.app 后自行配置后端地址, 或一键配置后端 https://sub-store.vercel.app?api=https://a.com/xxx (假设 https://a.com 是你后端的域名, /xxx 是自定义路径). 需注意 HTTPS 前端无法请求非本地的 HTTP 后端(部分浏览器上也无法访问本地 HTTP 后端). 请配置反代或在局域网自建 HTTP 前端. 如果还有问题, 可查看此排查说明: https://t.me/zhetengsha/1068';
     res.set('Content-Type', 'application/json;charset=UTF-8').send(
         JSON.stringify(
             {
                 status: 'success',
                 data: {
-                    guide: '⚠️⚠️⚠️ 您当前看到的是后端的响应. 若想配合前端使用, 可访问官方前端 https://sub-store.vercel.app 后自行配置后端地址, 或一键配置后端 https://sub-store.vercel.app?api=https://a.com/xxx (假设 https://a.com 是你后端的域名, /xxx 是自定义路径). 需注意 HTTPS 前端无法请求非本地的 HTTP 后端(部分浏览器上也无法访问本地 HTTP 后端). 请配置反代或在局域网自建 HTTP 前端. 如果还有问题, 可查看此排查说明: https://t.me/zhetengsha/1068',
+                    guide,
                     ...env,
                 },
             },

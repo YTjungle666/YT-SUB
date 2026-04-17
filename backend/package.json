@@ -5,7 +5,7 @@
   "main": "src/main.js",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "test": "mocha src/test/**/*.spec.js --require @babel/register --recursive",
+    "test": "NODE_NO_WARNINGS=1 SUB_STORE_LOG_LEVEL=silent mocha src/test/**/*.spec.js --require @babel/register --recursive --reporter dot",
     "serve": "node sub-store.min.js",
     "start": "nodemon -w src -w package.json --exec babel-node src/main.js",
     "dev:esbuild": "nodemon -w src -w package.json dev-esbuild.js",

@@ -3,6 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const { build } = require('esbuild');
 
+const sharedBuildOptions = {
+    logLevel: 'error',
+    logOverride: {
+        'direct-eval': 'silent',
+        'suspicious-boolean-not': 'silent',
+        'equals-nan': 'silent',
+    },
+};
+
 !(async () => {
     const version = JSON.parse(
         fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'),
@@ -24,6 +33,7 @@ const { build } = require('esbuild');
 
     for await (const artifact of artifacts) {
         await build({
+            ...sharedBuildOptions,
             entryPoints: [artifact.src],
             bundle: true,
             minify: true,
@@ -50,6 +60,7 @@ const { build } = require('esbuild');
     );
 
     await build({
+        ...sharedBuildOptions,
         entryPoints: ['dist/sub-store.no-bundle.js'],
         bundle: true,
         minify: true,
