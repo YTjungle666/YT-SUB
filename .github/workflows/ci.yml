@@ -41,7 +41,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:18080/ping
           curl -fsS http://127.0.0.1:18080/api/utils/env | tee /tmp/env.json
-          grep -q '"status":"success"' /tmp/env.json
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"success"' /tmp/env.json
           curl -fsS http://127.0.0.1:18080/ | grep -qi '<html'
 
       - name: Install zstd
